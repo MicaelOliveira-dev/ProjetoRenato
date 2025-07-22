@@ -12,8 +12,25 @@ connectDB();
 
 app.use(express.json());
 
+const allowedOrigins = [
+  'https://empactoon.com.br',
+  'https://www.sindserhdf.empactoon.com.br',
+  'https://sindserhdf.empactoon.com.br',
+  'http://localhost:5173'
+];
+
 app.use(cors({
-  origin: 'http://localhost:5173' 
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Explícito para métodos
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 
 // Create

@@ -195,7 +195,7 @@ const EditModal: React.FC<{
 
   const handleSave = async () => {
     try {
-      const response = await fetch(`http://localhost:3000/api/formularios/${formData._id}`, {
+      const response = await fetch(`https://api.empactoon.com.br/api/formularios/${formData._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -620,7 +620,7 @@ function Dash() {
         queryParams.append('Deletado', deletedAt)
       }
 
-      const url = `http://localhost:3000/api/formularios/filtros?${queryParams.toString()}`;
+      const url = `https://api.empactoon.com.br/api/formularios/filtros?${queryParams.toString()}`;
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -799,7 +799,7 @@ function Dash() {
 
     try {
       const response = await fetch(
-        `http://localhost:3000/api/formulario/relatorio-pdf?dataInicial=${dataInicial}&dataFinal=${dataFinal}`,
+        `https://api.empactoon.com.br/api/formulario/relatorio-pdf?dataInicial=${dataInicial}&dataFinal=${dataFinal}`,
         {
           method: "GET",
         }
@@ -861,7 +861,7 @@ function Dash() {
     setConfirmModalMessage('Tem certeza que deseja restaurar este cadastro?');
     setConfirmModalCallback(async () => {
       try {
-        const response = await fetch(`http://localhost:3000/api/formularios/undelete/${id}`, {
+        const response = await fetch(`https://api.empactoon.com.br/api/formularios/undelete/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
