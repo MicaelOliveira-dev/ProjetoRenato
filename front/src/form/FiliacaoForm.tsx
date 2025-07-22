@@ -137,10 +137,10 @@ const FiliacaoForm: React.FC = () => {
 
   const validateRG = (rg: string): boolean => {
     const cleanedRg = rg.replace(/\D/g, '');
-    return cleanedRg.length >= 7 && cleanedRg.length <= 10;
+    // ALTERAÇÃO AQUI: Mínimo de 5 dígitos para RG
+    return cleanedRg.length >= 5 && cleanedRg.length <= 10;
   };
 
-  // Esta função agora será chamada apenas no submit final para coletar todos os erros
   const validateAllFields = (): boolean => {
     const currentErrors: { [key: string]: string } = {};
     let isValid = true;
@@ -178,7 +178,7 @@ const FiliacaoForm: React.FC = () => {
       currentErrors.rg = 'RG é obrigatório.';
       isValid = false;
     } else if (!validateRG(formData.rg)) {
-      currentErrors.rg = 'RG inválido. Deve conter entre 7 e 10 dígitos numéricos.';
+      currentErrors.rg = 'RG inválido. Deve conter entre 5 e 10 dígitos numéricos.'; // Mensagem atualizada
       isValid = false;
     }
     if (!formData.cpf.trim()) {
@@ -260,19 +260,18 @@ const FiliacaoForm: React.FC = () => {
   };
 
   const handleNext = () => {
-    // Permite transitar sem validação de campos
     setCurrentStep((prevStep) => prevStep + 1);
-    setErrors({}); // Limpa os erros ao avançar para não exibir erros de passos anteriores
+    setErrors({});
   };
 
   const handlePrevious = () => {
     setCurrentStep((prevStep) => prevStep - 1);
-    setErrors({}); // Limpa os erros ao voltar para não exibir erros do passo atual
+    setErrors({});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isValid = validateAllFields(); // Valida todos os campos antes de submeter
+    const isValid = validateAllFields();
 
     if (isValid) {
       try {
@@ -313,7 +312,6 @@ const FiliacaoForm: React.FC = () => {
         setIsSubmitted(true);
       }
     } else {
-      // Se não for válido, exibe uma mensagem genérica e não avança nem submete
       setSubmitMessage('Por favor, preencha todos os campos obrigatórios e corrija os erros.');
       setIsError(true);
       setIsSubmitted(true);
@@ -379,7 +377,7 @@ const FiliacaoForm: React.FC = () => {
               type="date"
               value={formData.dataAdmissao}
               onChange={handleChange}
-              placeholder="DD/MM/AAAA" 
+              placeholder="DD/MM/AAAA"
               error={errors.dataAdmissao}
             />
             <Input
@@ -388,7 +386,7 @@ const FiliacaoForm: React.FC = () => {
               type="date"
               value={formData.dataNascimento}
               onChange={handleChange}
-              placeholder="DD/MM/AAAA" 
+              placeholder="DD/MM/AAAA"
               error={errors.dataNascimento}
             />
             <Input
@@ -638,7 +636,7 @@ const FiliacaoForm: React.FC = () => {
               <p className="mb-2"><strong className="text-blue-700">Email:</strong> {formData.email}</p>
               <p className="mb-2"><strong className="text-blue-700">Banco de Recebimento:</strong> {formData.bancoRecebimento}</p>
               <p className="mb-2"><strong className="text-blue-700">Termos Aceitos:</strong> {formData.aceitaTermos ? 'Sim' : 'Não'}</p>
-              <p className="mb-2"><strong className="text-blue-700">Data de Cadastro:</strong> {formData.dataCadastro}</p> {/* Exibindo a data de cadastro */}
+              <p className="mb-2"><strong className="text-blue-700">Data de Cadastro:</strong> {formData.dataCadastro}</p>
               {formData.observacoes && <p className="mb-2"><strong className="text-blue-700">Observações:</strong> {formData.observacoes}</p>}
             </div>
             <p className="text-center text-lg text-green-600 font-semibold">
@@ -708,7 +706,6 @@ const FiliacaoForm: React.FC = () => {
                 onClick={handleNext}
                 className={`px-6 py-3 rounded-lg font-semibold shadow-md transition duration-300 ease-in-out transform hover:-translate-y-0.5
                   ${currentStep === 1 ? 'ml-auto' : ''} bg-blue-600 text-white hover:bg-blue-700`}
-                // O botão "Próximo" não está desabilitado, permitindo a transição livre
               >
                 Próximo
               </button>
@@ -733,7 +730,7 @@ const FiliacaoForm: React.FC = () => {
               <button
                 onClick={() => {
                   setIsSubmitted(false);
-                  if (!isError) { // Só reseta o form se não houver erro de submissão
+                  if (!isError) {
                     setCurrentStep(1);
                     setFormData({
                       nome: '', nomeSocial: '', sexo: '', situacaoFuncional: '', matricula: '',
@@ -743,7 +740,7 @@ const FiliacaoForm: React.FC = () => {
                       telefoneFixo: '', celular: '', whatsapp: '', email: '', bancoRecebimento: '',
                       observacoes: '', aceitaTermos: false, dataCadastro: '',
                     });
-                    setErrors({}); // Limpa erros ao iniciar novo formulário
+                    setErrors({});
                   }
                 }}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition duration-300"
