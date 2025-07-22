@@ -35,10 +35,11 @@ const FiliacaoForm: React.FC = () => {
     bancoRecebimento: '',
     observacoes: '',
     aceitaTermos: false,
+    dataCadastro: '', // Novo campo para data de cadastro
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isError, setIsError] = useState(false);
-   const [submitMessage, setSubmitMessage] = useState('');
+  const [submitMessage, setSubmitMessage] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const sexoOptions = [
@@ -139,129 +140,141 @@ const FiliacaoForm: React.FC = () => {
     return cleanedRg.length >= 7 && cleanedRg.length <= 10;
   };
 
-  const validateStep = (step: number): boolean => {
+  // Esta função agora será chamada apenas no submit final para coletar todos os erros
+  const validateAllFields = (): boolean => {
     const currentErrors: { [key: string]: string } = {};
     let isValid = true;
 
-    if (step === 1) {
-      if (!formData.nome.trim()) {
-        currentErrors.nome = 'Nome é obrigatório.';
-        isValid = false;
-      }
-      if (!formData.sexo) {
-        currentErrors.sexo = 'Sexo é obrigatório.';
-        isValid = false;
-      }
-      if (!formData.situacaoFuncional) {
-        currentErrors.situacaoFuncional = 'Situação funcional é obrigatória.';
-        isValid = false;
-      }
-      if (!formData.matricula.trim()) {
-        currentErrors.matricula = 'Matrícula é obrigatória.';
-        isValid = false;
-      }
-      if (!formData.nomeMae.trim()) {
-        currentErrors.nomeMae = 'Nome da mãe é obrigatório.';
-        isValid = false;
-      }
-      if (!formData.dataAdmissao) {
-        currentErrors.dataAdmissao = 'Data de admissão é obrigatória.';
-        isValid = false;
-      }
-      if (!formData.dataNascimento) {
-        currentErrors.dataNascimento = 'Data de nascimento é obrigatória.';
-        isValid = false;
-      }
-      if (!formData.rg.trim()) {
-        currentErrors.rg = 'RG é obrigatório.';
-        isValid = false;
-      } else if (!validateRG(formData.rg)) {
-        currentErrors.rg = 'RG inválido. Deve conter entre 7 e 10 dígitos numéricos.';
-        isValid = false;
-      }
-      if (!formData.cpf.trim()) {
-        currentErrors.cpf = 'CPF é obrigatório.';
-        isValid = false;
-      } else if (!validateCPF(formData.cpf)) {
-        currentErrors.cpf = 'CPF inválido.';
-        isValid = false;
-      }
-    } else if (step === 2) {
-      if (!formData.lotacao) {
-        currentErrors.lotacao = 'Lotação é obrigatória.';
-        isValid = false;
-      }
-      if (!formData.setor.trim()) {
-        currentErrors.setor = 'Setor é obrigatório.';
-        isValid = false;
-      }
-      if (!formData.cargo.trim()) {
-        currentErrors.cargo = 'Cargo é obrigatório.';
-        isValid = false;
-      }
-      if (!formData.salarioBase.trim() || isNaN(Number(formData.salarioBase))) {
-        currentErrors.salarioBase = 'Salário base é obrigatório e deve ser um número.';
-        isValid = false;
-      }
-    } else if (step === 3) {
-      if (!formData.enderecoResidencial.trim()) {
-        currentErrors.enderecoResidencial = 'Endereço residencial é obrigatório.';
-        isValid = false;
-      }
-      if (!formData.bairro.trim()) {
-        currentErrors.bairro = 'Bairro é obrigatório.';
-        isValid = false;
-      }
-      if (!formData.cidade.trim()) {
-        currentErrors.cidade = 'Cidade é obrigatória.';
-        isValid = false;
-      }
-      if (!formData.estado) {
-        currentErrors.estado = 'Estado é obrigatório.';
-        isValid = false;
-      }
-      if (!formData.cep.trim() || !/^\d{5}-?\d{3}$/.test(formData.cep)) {
-        currentErrors.cep = 'CEP inválido ou obrigatório (formato XXXXX-XXX).';
-        isValid = false;
-      }
-    } else if (step === 4) {
-      if (!formData.telefoneFixo.trim() && !formData.celular.trim()) {
-        currentErrors.telefoneFixo = 'Pelo menos um telefone (fixo ou celular) é obrigatório.';
-        currentErrors.celular = 'Pelo menos um telefone (fixo ou celular) é obrigatório.';
-        isValid = false;
-      }
-      if (!formData.email.trim() || !/\S+@\S+\.\S/.test(formData.email)) {
-        currentErrors.email = 'Email inválido ou obrigatório.';
-        isValid = false;
-      }
-      if (!formData.bancoRecebimento.trim()) {
-        currentErrors.bancoRecebimento = 'Banco de recebimento é obrigatório.';
-        isValid = false;
-      }
-    } else if (step === 5) {
-      if (!formData.aceitaTermos) {
-        currentErrors.aceitaTermos = 'Você deve aceitar os termos e condições.';
-        isValid = false;
-      }
+    // STEP 1 VALIDATIONS
+    if (!formData.nome.trim()) {
+      currentErrors.nome = 'Nome é obrigatório.';
+      isValid = false;
+    }
+    if (!formData.sexo) {
+      currentErrors.sexo = 'Sexo é obrigatório.';
+      isValid = false;
+    }
+    if (!formData.situacaoFuncional) {
+      currentErrors.situacaoFuncional = 'Situação funcional é obrigatória.';
+      isValid = false;
+    }
+    if (!formData.matricula.trim()) {
+      currentErrors.matricula = 'Matrícula é obrigatória.';
+      isValid = false;
+    }
+    if (!formData.nomeMae.trim()) {
+      currentErrors.nomeMae = 'Nome da mãe é obrigatório.';
+      isValid = false;
+    }
+    if (!formData.dataAdmissao) {
+      currentErrors.dataAdmissao = 'Data de admissão é obrigatória.';
+      isValid = false;
+    }
+    if (!formData.dataNascimento) {
+      currentErrors.dataNascimento = 'Data de nascimento é obrigatória.';
+      isValid = false;
+    }
+    if (!formData.rg.trim()) {
+      currentErrors.rg = 'RG é obrigatório.';
+      isValid = false;
+    } else if (!validateRG(formData.rg)) {
+      currentErrors.rg = 'RG inválido. Deve conter entre 7 e 10 dígitos numéricos.';
+      isValid = false;
+    }
+    if (!formData.cpf.trim()) {
+      currentErrors.cpf = 'CPF é obrigatório.';
+      isValid = false;
+    } else if (!validateCPF(formData.cpf)) {
+      currentErrors.cpf = 'CPF inválido.';
+      isValid = false;
     }
 
-    setErrors(currentErrors);
+    // STEP 2 VALIDATIONS
+    if (!formData.lotacao) {
+      currentErrors.lotacao = 'Lotação é obrigatória.';
+      isValid = false;
+    }
+    if (!formData.setor.trim()) {
+      currentErrors.setor = 'Setor é obrigatório.';
+      isValid = false;
+    }
+    if (!formData.cargo.trim()) {
+      currentErrors.cargo = 'Cargo é obrigatório.';
+      isValid = false;
+    }
+    if (!formData.salarioBase.trim() || isNaN(Number(formData.salarioBase))) {
+      currentErrors.salarioBase = 'Salário base é obrigatório e deve ser um número.';
+      isValid = false;
+    }
+
+    // STEP 3 VALIDATIONS
+    if (!formData.enderecoResidencial.trim()) {
+      currentErrors.enderecoResidencial = 'Endereço residencial é obrigatório.';
+      isValid = false;
+    }
+    if (!formData.bairro.trim()) {
+      currentErrors.bairro = 'Bairro é obrigatório.';
+      isValid = false;
+    }
+    if (!formData.cidade.trim()) {
+      currentErrors.cidade = 'Cidade é obrigatória.';
+      isValid = false;
+    }
+    if (!formData.estado) {
+      currentErrors.estado = 'Estado é obrigatório.';
+      isValid = false;
+    }
+    if (!formData.cep.trim() || !/^\d{5}-?\d{3}$/.test(formData.cep)) {
+      currentErrors.cep = 'CEP inválido ou obrigatório (formato XXXXX-XXX).';
+      isValid = false;
+    }
+
+    // STEP 4 VALIDATIONS
+    if (!formData.telefoneFixo.trim() && !formData.celular.trim()) {
+      currentErrors.telefoneFixo = 'Pelo menos um telefone (fixo ou celular) é obrigatório.';
+      currentErrors.celular = 'Pelo menos um telefone (fixo ou celular) é obrigatório.';
+      isValid = false;
+    }
+    if (!formData.email.trim() || !/\S+@\S+\.\S/.test(formData.email)) {
+      currentErrors.email = 'Email inválido ou obrigatório.';
+      isValid = false;
+    }
+    if (!formData.bancoRecebimento.trim()) {
+      currentErrors.bancoRecebimento = 'Banco de recebimento é obrigatório.';
+      isValid = false;
+    }
+
+    // STEP 5 VALIDATIONS
+    if (!formData.aceitaTermos) {
+      currentErrors.aceitaTermos = 'Você deve aceitar os termos e condições.';
+      isValid = false;
+    }
+    if (!formData.dataCadastro) {
+        currentErrors.dataCadastro = 'Data de cadastro é obrigatória.';
+        isValid = false;
+    }
+
+
+    setErrors(currentErrors); // Atualiza os erros no estado
     return isValid;
   };
 
   const handleNext = () => {
-    if (validateStep(currentStep)) {
-      setCurrentStep((prevStep) => prevStep + 1);
-    }
+    // Permite transitar sem validação de campos
+    setCurrentStep((prevStep) => prevStep + 1);
+    setErrors({}); // Limpa os erros ao avançar para não exibir erros de passos anteriores
   };
 
   const handlePrevious = () => {
     setCurrentStep((prevStep) => prevStep - 1);
+    setErrors({}); // Limpa os erros ao voltar para não exibir erros do passo atual
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateStep(currentStep)) {
+    const isValid = validateAllFields(); // Valida todos os campos antes de submeter
+
+    if (isValid) {
       try {
         const response = await fetch('https://api.empactoon.com.br/api/formularios', {
           method: 'POST',
@@ -291,14 +304,19 @@ const FiliacaoForm: React.FC = () => {
           }
           setSubmitMessage(errorMessage);
           setIsError(true);
-          setIsSubmitted(true); 
+          setIsSubmitted(true);
         }
       } catch (error) {
         console.error('Erro na requisição:', error);
         setSubmitMessage('Erro de conexão com o servidor. Tente novamente mais tarde.');
         setIsError(true);
-        setIsSubmitted(true); 
+        setIsSubmitted(true);
       }
+    } else {
+      // Se não for válido, exibe uma mensagem genérica e não avança nem submete
+      setSubmitMessage('Por favor, preencha todos os campos obrigatórios e corrija os erros.');
+      setIsError(true);
+      setIsSubmitted(true);
     }
   };
 
@@ -313,7 +331,7 @@ const FiliacaoForm: React.FC = () => {
               id="nome"
               value={formData.nome}
               onChange={handleChange}
-              placeholder="Seu nome"
+              placeholder="Seu nome completo"
               error={errors.nome}
             />
             <Input
@@ -361,6 +379,7 @@ const FiliacaoForm: React.FC = () => {
               type="date"
               value={formData.dataAdmissao}
               onChange={handleChange}
+              placeholder="DD/MM/AAAA" 
               error={errors.dataAdmissao}
             />
             <Input
@@ -369,6 +388,7 @@ const FiliacaoForm: React.FC = () => {
               type="date"
               value={formData.dataNascimento}
               onChange={handleChange}
+              placeholder="DD/MM/AAAA" 
               error={errors.dataNascimento}
             />
             <Input
@@ -568,6 +588,15 @@ const FiliacaoForm: React.FC = () => {
               onChange={handleChange}
               error={errors.aceitaTermos}
             />
+            <Input
+                label="Data de Cadastro"
+                id="dataCadastro"
+                type="date"
+                value={formData.dataCadastro}
+                onChange={handleChange}
+                placeholder="DD/MM/AAAA"
+                error={errors.dataCadastro}
+            />
             <TextArea
               label="Observações"
               id="observacoes"
@@ -609,6 +638,7 @@ const FiliacaoForm: React.FC = () => {
               <p className="mb-2"><strong className="text-blue-700">Email:</strong> {formData.email}</p>
               <p className="mb-2"><strong className="text-blue-700">Banco de Recebimento:</strong> {formData.bancoRecebimento}</p>
               <p className="mb-2"><strong className="text-blue-700">Termos Aceitos:</strong> {formData.aceitaTermos ? 'Sim' : 'Não'}</p>
+              <p className="mb-2"><strong className="text-blue-700">Data de Cadastro:</strong> {formData.dataCadastro}</p> {/* Exibindo a data de cadastro */}
               {formData.observacoes && <p className="mb-2"><strong className="text-blue-700">Observações:</strong> {formData.observacoes}</p>}
             </div>
             <p className="text-center text-lg text-green-600 font-semibold">
@@ -639,11 +669,11 @@ const FiliacaoForm: React.FC = () => {
         `}
       </style>
       <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 hover:scale-[1.01] border border-gray-100">
-        <div className="flex justify-center mb-4">  
+        <div className="flex justify-center mb-4">
           <img className='w-30' src={Logo} />
-        </div>        
+        </div>
         <h2 className="text-3xl font-extrabold text-gray-800 mb-8 text-center">SINDSERH - DF</h2>
-        <p className='text-xs text-center mb-8'>SINDICATO DOS TRABALHADORES DE EMPRESAS PÚBLICA DE SERVIÇOS HOSPITALARES - SINDSERH - DF</p>
+        <p className="text-xs text-center mb-8">SINDICATO DOS TRABALHADORES DE EMPRESAS PÚBLICA DE SERVIÇOS HOSPITALARES - SINDSERH - DF</p>
         <div className="flex justify-center mb-8">
           {[1, 2, 3, 4, 5, 6].map((step) => (
             <div
@@ -677,8 +707,8 @@ const FiliacaoForm: React.FC = () => {
                 type="button"
                 onClick={handleNext}
                 className={`px-6 py-3 rounded-lg font-semibold shadow-md transition duration-300 ease-in-out transform hover:-translate-y-0.5
-                  ${currentStep === 1 ? 'ml-auto' : ''} ${Object.keys(errors).length > 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-                disabled={Object.keys(errors).length > 0}
+                  ${currentStep === 1 ? 'ml-auto' : ''} bg-blue-600 text-white hover:bg-blue-700`}
+                // O botão "Próximo" não está desabilitado, permitindo a transição livre
               >
                 Próximo
               </button>
@@ -698,24 +728,27 @@ const FiliacaoForm: React.FC = () => {
         {isSubmitted && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
             <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full">
-              <h3 className="text-2xl font-bold text-green-700 mb-4">{isError ? 'Erro no Envio!' : 'Formulário Enviado com Sucesso!'}</h3>
+              <h3 className={`text-2xl font-bold mb-4 ${isError ? 'text-red-600' : 'text-green-700'}`}>{isError ? 'Erro no Envio!' : 'Formulário Enviado com Sucesso!'}</h3>
               <p className="text-gray-700 mb-6">{submitMessage}</p>
               <button
                 onClick={() => {
                   setIsSubmitted(false);
-                  setCurrentStep(1);
-                  setFormData({
-                    nome: '', nomeSocial: '', sexo: '', situacaoFuncional: '', matricula: '',
-                    nomeMae: '', dataAdmissao: '', dataNascimento: '', rg: '', cpf: '',
-                    lotacao: '', setor: '', cargo: '', salarioBase: '',
-                    enderecoResidencial: '', bairro: '', cidade: '', estado: '', cep: '',
-                    telefoneFixo: '', celular: '', whatsapp: '', email: '', bancoRecebimento: '',
-                    observacoes: '', aceitaTermos: false,
-                  });
+                  if (!isError) { // Só reseta o form se não houver erro de submissão
+                    setCurrentStep(1);
+                    setFormData({
+                      nome: '', nomeSocial: '', sexo: '', situacaoFuncional: '', matricula: '',
+                      nomeMae: '', dataAdmissao: '', dataNascimento: '', rg: '', cpf: '',
+                      lotacao: '', setor: '', cargo: '', salarioBase: '',
+                      enderecoResidencial: '', bairro: '', cidade: '', estado: '', cep: '',
+                      telefoneFixo: '', celular: '', whatsapp: '', email: '', bancoRecebimento: '',
+                      observacoes: '', aceitaTermos: false, dataCadastro: '',
+                    });
+                    setErrors({}); // Limpa erros ao iniciar novo formulário
+                  }
                 }}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition duration-300"
               >
-                Novo Formulário
+                {isError ? 'Tentar Novamente' : 'Novo Formulário'}
               </button>
             </div>
           </div>
