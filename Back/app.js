@@ -1,16 +1,21 @@
 const express = require('express');
 const connectDB = require('./config/db');
-const Formulario = require('./models/Formulario'); 
-const pdfmake = require('pdfmake/build/pdfmake');
-const vfsFonts = require('pdfmake/build/vfs_fonts');
+const CadastroModelo = require('./models/CadastroModelo'); 
+const FormularioModelo = require('./models/FormularioModelo');
+const puppeteer = require('puppeteer');
+const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config(); 
-
 const app = express();
 
 connectDB();
 
 app.use(express.json());
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+});
 
 const allowedOrigins = [
   'https://empactoon.com.br',
@@ -27,11 +32,186 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Explícito para métodos
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
   optionsSuccessStatus: 200
 }));
+
+async function gerarRelatorioComPuppeteer(formNome, cadastros) {
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    
+    const htmlContent = `
+        <html>
+            <head>
+                <style>
+                    body { font-family: 'Roboto', sans-serif; }
+                    .header { font-size: 22px; text-align: center; margin-bottom: 20px; }
+                    .record { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+                    .record h3 { margin-top: 0; color: #333; }
+                    .record p { margin: 5px 0; }
+                    .record strong { color: #555; }
+                </style>
+            </head>
+            <body>
+                <div class="header">Relatório Detalhado de Cadastros</div>
+                <p><strong>Formulário:</strong> ${formNome}</p>
+                ${cadastros.map(cadastro => {
+                    const dadosDoFormulario = cadastro._doc;
+
+                    const camposHTML = Object.entries(dadosDoFormulario)
+                        .filter(([key]) => key !== '_id' && key !== '__v')
+                        .map(([key, value]) => `
+                            <p><strong>${key.charAt(0).toUpperCase() + key.slice(1)}:</strong> ${value}</p>
+                        `).join('');
+
+                    return `
+                        <div class="record">
+                            <h3>Registro #${cadastro._id}</h3>
+                            ${camposHTML}
+                        </div>
+                    `;
+                }).join('')}
+            </body>
+        </html>
+    `;
+
+    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+    const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true 
+    });
+
+    await browser.close();
+
+    return pdfBuffer;
+}
+
+app.get('/api/formularios/relatorio-pdf', async (req, res) => {
+    try {
+        const { formId } = req.query;
+
+        if (!formId) {
+            return res.status(400).json({ msg: 'Por favor, forneça o `formId` para o relatório.' });
+        }
+        
+        let cadastros;
+        try {
+            cadastros = await CadastroModelo.find({
+                formId: new mongoose.Types.ObjectId(formId)            
+            });
+        } catch (error) { 
+            cadastros = await CadastroModelo.find({
+                formId: formId
+            });
+        }
+
+        if (cadastros.length === 0) {
+            return res.status(404).json({ msg: 'Nenhum cadastro encontrado para o formulário e período especificados.' });
+        }
+
+        const formularioMetadata = await FormularioModelo.findById(formId);
+        const formNome = formularioMetadata ? formularioMetadata.nome : 'Formulário Desconhecido';
+
+        const pdfBuffer = await gerarRelatorioComPuppeteer(formNome, cadastros);
+
+        res.writeHead(200, {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename=relatorio_${formId}.pdf`,
+            'Content-Length': pdfBuffer.length
+        });
+        res.end(pdfBuffer);
+
+    } catch (err) {
+        console.error('Erro ao gerar relatório PDF detalhado:', err.message);
+        res.status(500).send('Erro no servidor ao gerar o relatório PDF.');
+    }
+});
+
+app.get('/api/formularios/nomes', async (req, res) => {
+    try {
+        const formularios = await FormularioModelo.find({}, { nome: 1, _id: 1 });
+        res.status(200).json(formularios);
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao buscar formulários', error: error.message });
+    }
+});
+
+app.get('/api/formulario/:id', async (req, res) => {
+    try {
+        const formulario = await FormularioModelo.findById(req.params.id);
+        if (!formulario) {
+            return res.status(404).json({ message: 'Formulário não encontrado.' });
+        }
+        res.status(200).json(formulario);
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao buscar formulário', error: error.message });
+    }
+});
+
+app.post('/api/formularios/submeter', async (req, res) => {
+    try {
+        const novoCadastro = new CadastroModelo(req.body);
+        const cadastroSalvo = await novoCadastro.save();
+        res.status(201).json(cadastroSalvo);
+    } catch (error) {
+        res.status(400).json({ message: 'Erro ao submeter o formulário', error: error.message });
+    }
+});
+
+// GET /api/formularios
+app.get('/api/formulariosCriados', async (req, res) => {
+    try {
+        const formularios = await FormularioModelo.find();
+        res.status(200).json(formularios);
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao buscar formulários', error: error.message });
+    }
+});
+
+// POST /api/formularios
+app.post('/api/criarFormularios', async (req, res) => {
+    const { nome, campos, textoTermos, logoUrl } = req.body;
+
+    const idUnico = new mongoose.Types.ObjectId();
+    const urlFormulario = `http://localhost:5173/form/${idUnico}`;
+
+    try {
+        const novoFormulario = new FormularioModelo({
+            _id: idUnico,
+            nome,
+            campos,
+            url: urlFormulario,
+            textoTermos,
+            logoUrl,
+        });
+
+        const formularioSalvo = await novoFormulario.save();
+        res.status(201).json(formularioSalvo);
+
+    } catch (error) {
+        res.status(400).json({ message: 'Erro ao criar o formulário', error: error.message });
+    }
+});
+
+app.delete('/api/formulariosCriados/:id', async (req, res) => {
+    try {
+        const formulario = await FormularioModelo.findByIdAndDelete(req.params.id);
+        
+        if (!formulario) {
+            return res.status(404).json({ message: 'Formulário não encontrado.' });
+        }
+        
+        res.status(200).json({ message: 'Formulário excluído com sucesso!' });
+    } catch (error) {
+        if (error.kind === 'ObjectId') {
+             return res.status(400).json({ message: 'ID de formulário inválido.' });
+        }
+        res.status(500).json({ message: 'Erro no servidor.', error: error.message });
+    }
+});
 
 // Create
 app.post('/api/formularios', async (req, res) => {
@@ -57,67 +237,6 @@ app.post('/api/formularios', async (req, res) => {
             else msg = `${field} já cadastrado.`;
             return res.status(400).json({ msg });
         }
-        res.status(500).send('Erro no servidor.');
-    }
-});
-
-// Filtros
-app.get('/api/formularios', async (req, res) => {
-    try {
-        const filters = {};
-
-        if (req.query.nome) {
-            filters.nome = { $regex: req.query.nome, $options: 'i' };
-        }
-
-        if (req.query.situacaoFuncional) {
-            filters.situacaoFuncional = req.query.situacaoFuncional;
-        }
-
-        if (req.query.dataEnvioDesde || req.query.dataEnvioAte) {
-            filters.dataEnvio = {};
-            if (req.query.dataEnvioDesde) {
-                filters.dataEnvio.$gte = new Date(req.query.dataEnvioDesde);
-            }
-            if (req.query.dataEnvioAte) {
-                let endDate = new Date(req.query.dataEnvioAte);
-                endDate.setUTCHours(23, 59, 59, 999);
-                filters.dataEnvio.$lte = endDate;
-            }
-        }
-
-        if (req.query.matricula) {
-            filters.matricula = req.query.matricula;
-        }
-
-        if (req.query.dataNascimentoDesde || req.query.dataNascimentoAte) {
-            filters.dataNascimento = {};
-            if (req.query.dataNascimentoDesde) {
-                filters.dataNascimento.$gte = new Date(req.query.dataNascimentoDesde);
-            }
-            if (req.query.dataNascimentoAte) {
-                let endDate = new Date(req.query.dataNascimentoAte);
-                endDate.setUTCHours(23, 59, 59, 999);
-                filters.dataNascimento.$lte = endDate;
-            }
-        }
-
-        if (req.query.email) {
-            filters.email = { $regex: req.query.email, $options: 'i' };
-        }
-
-        if (req.query.sexo) {
-            filters.sexo = req.query.sexo;
-        }
-
-        if (req.query.cpf) {
-            filters.cpf = req.query.cpf.replace(/\D/g, '');
-        }
-
-        const formularios = await Formulario.find(filters);
-        res.json(formularios);
-    } catch (err) {
-        console.error(err.message);
         res.status(500).send('Erro no servidor.');
     }
 });
@@ -201,62 +320,35 @@ app.post('/api/login', (req, res) => {
     }
 });
 
-// filtros
+// GET /api/formularios/filtros
 app.get('/api/formularios/filtros', async (req, res) => {
     try {
         const {
-            nomeRazaoSocial, 
+            formId, 
+            nomeCompleto, 
             situacaoFuncional,
-            dataCadastramentoInicial, 
-            dataCadastramentoFinal,
             matricula,
-            dataNascimentoInicial,
-            dataNascimentoFinal,
             email,
-            sexo
+            sexo,
+            deletedAt
         } = req.query;
 
         let query = {};
 
-        if (nomeRazaoSocial) {
-            query.$or = [
-                { nome: { $regex: nomeRazaoSocial, $options: 'i' } }, 
-                { razaoSocial: { $regex: nomeRazaoSocial, $options: 'i' } }
-            ];
+        if (formId) {
+            query.formId = new mongoose.Types.ObjectId(formId); 
+        }
+        
+        if (nomeCompleto) {
+            query.nomeCompleto = { $regex: nomeCompleto, $options: 'i' };
         }
 
         if (situacaoFuncional) {
             query.situacaoFuncional = situacaoFuncional;
         }
-
-        if (dataCadastramentoInicial || dataCadastramentoFinal) {
-            query.dataCadastramento = {};
-            if (dataCadastramentoInicial) {
-                query.dataCadastramento.$gte = new Date(dataCadastramentoInicial);
-            }
-            if (dataCadastramentoFinal) {
-                let endDate = new Date(dataCadastramentoFinal);
-                endDate.setHours(23, 59, 59, 999);
-                query.dataCadastramento.$lte = endDate;
-            }
-        }
-
         if (matricula) {
             query.matricula = matricula;
         }
-
-        if (dataNascimentoInicial || dataNascimentoFinal) {
-            query.dataNascimento = {};
-            if (dataNascimentoInicial) {
-                query.dataNascimento.$gte = new Date(dataNascimentoInicial);
-            }
-            if (dataNascimentoFinal) {
-                let endDate = new Date(dataNascimentoFinal);
-                endDate.setHours(23, 59, 59, 999);
-                query.dataNascimento.$lte = endDate;
-            }
-        }
-
         if (email) {
             query.email = email;
         }
@@ -264,10 +356,16 @@ app.get('/api/formularios/filtros', async (req, res) => {
         if (sexo) {
             query.sexo = sexo;
         }
+        
+        if (deletedAt) {
+            query.deletedAt = { $ne: null };
+        } else {
+            query.deletedAt = null;
+        }
 
-        const formularios = await Formulario.find(query);
+        const cadastros = await CadastroModelo.find(query);
 
-        res.json(formularios);
+        res.json(cadastros);
 
     } catch (err) {
         console.error(err.message);
@@ -275,219 +373,3 @@ app.get('/api/formularios/filtros', async (req, res) => {
     }
 });
 
-// Quantidade de Cadastros
-app.get('/api/formulario/cadastros', async (req, res) => {
-    try {
-        const totalCadastros = await Formulario.countDocuments({}); 
-        res.json({ total: totalCadastros });
-    }catch(err){
-        console.error(err.message);
-        res.status(500).send('Erro no servidor ao buscar quantidade total de cadastros.');
-    }
-});
-
-// Quantidade de cadastro por sexo
-app.get('/api/formulario/cadastrosSexo', async (req, res) => {
-    try {
-        const cadastrosPorSexo = await Formulario.aggregate([
-            {
-                $group: {
-                    _id: "$sexo", 
-                    count: { $sum: 1 } 
-                }
-            },
-            {
-                $project: {
-                    sexo: "$_id", 
-                    count: 1,
-                    _id: 0 
-                }
-            }
-        ]);
-        res.json(cadastrosPorSexo);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Erro no servidor ao buscar quantidade de cadastros por sexo.');
-    }
-});
-
-// Quantidade de cadastro setor
-app.get('/api/formulario/cadastrosSetor', async (req, res) => {
-    try {
-        const cadastrosPorSetor = await Formulario.aggregate([
-            {
-                $group: {
-                    _id: "$setor", 
-                    count: { $sum: 1 }
-                }
-            },
-            {
-                $project: {
-                    setor: "$_id", 
-                    count: 1,
-                    _id: 0
-                }
-            }
-        ]);
-        res.json(cadastrosPorSetor);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Erro no servidor ao buscar quantidade de cadastros por setor.');
-    }
-});
-
-//Relatorio Pdf por periodo de cadastro
-app.get('/api/formulario/relatorio-pdf', async (req, res) => {
-    try {
-        const { dataInicial, dataFinal } = req.query;
-
-        if (!dataInicial || !dataFinal) {
-            return res.status(400).json({ msg: 'Por favor, forneça `dataInicial` e `dataFinal` para o relatório.' });
-        }
-
-        let startDate = new Date(dataInicial);
-        let endDate = new Date(dataFinal);
-        endDate.setHours(23, 59, 59, 999); 
-
-        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-            return res.status(400).json({ msg: 'Formato de data inválido. Use YYYY-MM-DD.' });
-        }
-        if (startDate > endDate) {
-            return res.status(400).json({ msg: 'A data inicial não pode ser posterior à data final.' });
-        }
-
-        const formularios = await Formulario.find({
-            createdAt: {
-                $gte: startDate,
-                $lte: endDate
-            }
-        }).sort({ createdAt: 1 }); 
-
-        if (formularios.length === 0) {
-            return res.status(404).json({ msg: 'Nenhum cadastro encontrado para o período especificado.' });
-        }
-
-        let content = [
-            { text: `Relatório Detalhado de Cadastros`, style: 'header' },
-            { text: `Período: ${dataInicial} a ${dataFinal}`, style: 'subheader' },
-            '\n'
-        ];
-
-        formularios.forEach((form, index) => {
-            if (index > 0) {
-                content.push({ text: '', pageBreak: 'before' });
-            }
-
-            content.push(
-                { text: `Formulário #${index + 1} - Matrícula: ${form.matricula || 'N/A'}`, style: 'formTitle' },
-                { text: `Nome: ${form.nome || 'N/A'}`, style: 'field' },
-                { text: `Nome Social: ${form.nomeSocial || 'N/A'}`, style: 'field' },
-                { text: `Sexo: ${form.sexo || 'N/A'}`, style: 'field' },
-                { text: `Situação Funcional: ${form.situacaoFuncional || 'N/A'}`, style: 'field' },
-                { text: `Nome da Mãe: ${form.nomeMae || 'N/A'}`, style: 'field' },
-                { text: `Data de Admissão: ${form.dataAdmissao ? form.dataAdmissao.toLocaleDateString('pt-BR') : 'N/A'}`, style: 'field' },
-                { text: `Data de Nascimento: ${form.dataNascimento ? form.dataNascimento.toLocaleDateString('pt-BR') : 'N/A'}`, style: 'field' },
-                { text: `RG: ${form.rg || 'N/A'}`, style: 'field' },
-                { text: `CPF: ${form.cpf || 'N/A'}`, style: 'field' },
-                { text: `Lotação: ${form.lotacao || 'N/A'}`, style: 'field' },
-                { text: `Setor: ${form.setor || 'N/A'}`, style: 'field' },
-                { text: `Cargo: ${form.cargo || 'N/A'}`, style: 'field' },
-                { text: `Salário Base: ${form.salarioBase ? form.salarioBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A'}`, style: 'field' },
-                { text: `Endereço: ${form.enderecoResidencial || 'N/A'}`, style: 'field' },
-                { text: `Bairro: ${form.bairro || 'N/A'}`, style: 'field' },
-                { text: `Cidade: ${form.cidade || 'N/A'}`, style: 'field' },
-                { text: `Estado: ${form.estado || 'N/A'}`, style: 'field' },
-                { text: `CEP: ${form.cep || 'N/A'}`, style: 'field' },
-                { text: `Telefone Fixo: ${form.telefoneFixo || 'N/A'}`, style: 'field' },
-                { text: `Celular: ${form.celular || 'N/A'}`, style: 'field' },
-                { text: `WhatsApp: ${form.whatsapp || 'N/A'}`, style: 'field' },
-                { text: `Email: ${form.email || 'N/A'}`, style: 'field' },
-                { text: `Banco de Recebimento: ${form.bancoRecebimento || 'N/A'}`, style: 'field' },
-                { text: `Observações: ${form.observacoes || 'N/A'}`, style: 'field' },
-                { text: `Aceita Termos: ${form.aceitaTermos ? 'Sim' : 'Não'}`, style: 'field' },
-                { text: `Mensagem: ${form.mensagem || 'N/A'}`, style: 'field' },
-                { text: `Data de Envio: ${form.dataEnvio ? form.dataEnvio.toLocaleDateString('pt-BR') : 'N/A'}`, style: 'field' },
-                { text: `Data de Criação (DB): ${form.createdAt ? form.createdAt.toLocaleDateString('pt-BR') : 'N/A'}`, style: 'field' },
-                { text: `Última Atualização (DB): ${form.updatedAt ? form.updatedAt.toLocaleDateString('pt-BR') : 'N/A'}`, style: 'field' },
-                '\n\n' 
-            );
-        });
-
-        const documentDefinition = {
-            content: content, 
-            styles: {
-                header: {
-                    fontSize: 22,
-                    bold: true,
-                    alignment: 'center',
-                    margin: [0, 0, 0, 20]
-                },
-                subheader: {
-                    fontSize: 16,
-                    bold: true,
-                    alignment: 'center',
-                    margin: [0, 0, 0, 10]
-                },
-                formTitle: {
-                    fontSize: 14,
-                    bold: true,
-                    margin: [0, 15, 0, 5],
-                    decoration: 'underline'
-                },
-                field: {
-                    fontSize: 10,
-                    margin: [0, 2, 0, 2]
-                },
-            },
-            defaultStyle: {
-                fontSize: 10
-            }
-        };
-
-        const pdfDoc = pdfmake.createPdf(documentDefinition);
-
-        pdfDoc.getBuffer((buffer) => {
-            res.writeHead(200, {
-                'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename=relatorio_detalhado_cadastros_${dataInicial}_a_${dataFinal}.pdf`,
-                'Content-Length': buffer.length
-            });
-            res.end(buffer);
-        });
-
-    } catch (err) {
-        console.error('Erro ao gerar relatório PDF detalhado:', err.message);
-        res.status(500).send('Erro no servidor ao gerar o relatório PDF.');
-    }
-});
-
-//restaurar soft delete
-app.put('/api/formularios/undelete/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        let formulario = await Formulario.findById(id); 
-
-        if (!formulario) {
-            return res.status(404).json({ msg: 'Formulário não encontrado.' });
-        }
-
-        if (formulario.deletedAt === null) {
-            return res.status(400).json({ msg: 'O formulário não estava no estado de deletado para ser restaurado.' });
-        }
-
-        formulario.deletedAt = null; 
-        await formulario.save(); 
-
-        res.json({ msg: 'Formulário restaurado com sucesso.', formulario }); 
-    } catch (err) {
-        console.error(err.message);
-        if (err.name === 'CastError') {
-            return res.status(400).json({ msg: 'ID do Formulário inválido.' });
-        }
-        res.status(500).send('Erro no servidor ao restaurar formulário.');
-    }
-});
-
-const PORT = process.env.PORT || 5000; 
-
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));

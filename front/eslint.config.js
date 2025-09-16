@@ -3,11 +3,11 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
-import { globalIgnores } from 'eslint/config'
 
-export default tseslint.config([
-  globalIgnores(['dist']),
+export default tseslint.config(
   {
+    // A propriedade `ignores` deve ser a primeira entrada na sua configuração
+    ignores: ['dist/'],
     files: ['**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
@@ -20,4 +20,4 @@ export default tseslint.config([
       globals: globals.browser,
     },
   },
-])
+)

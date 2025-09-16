@@ -1,11 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { FiEye, FiEdit, FiTrash2, FiSearch, FiXCircle } from 'react-icons/fi';
-import Chart from 'chart.js/auto';
-import { IoReaderOutline } from "react-icons/io5";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+interface Formulario {
+  _id: string; 
+  nome: string;
+  url: string;
+  campos: string[];
+}
 
 interface Cadastro {
   _id: string;
-  nome?: string;
+  nomeCompleto?: string;
   razaoSocial?: string;
   sexo: 'Masculino' | 'Feminino' | 'Outro';
   lotacao?: string;
@@ -38,31 +43,6 @@ interface Cadastro {
   deletedAt?: string | null;
 }
 
-const ConfirmModal: React.FC<{ message: string; onConfirm: () => void; onCancel: () => void }> = ({ message, onConfirm, onCancel }) => {
-  return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 animate-fade-in">
-      <div className="bg-white rounded-lg p-8 shadow-2xl max-w-sm w-full transform scale-95 animate-scale-in">
-        <h3 className="text-xl font-bold mb-4 text-gray-800">Confirmação</h3>
-        <p className="text-gray-700 mb-6">{message}</p>
-        <div className="flex justify-end space-x-4">
-          <button
-            onClick={onCancel}
-            className="px-5 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-5 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors duration-200"
-          >
-            Confirmar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const AlertModal: React.FC<{ message: string; onClose: () => void }> = ({ message, onClose }) => {
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 animate-fade-in">
@@ -83,55 +63,43 @@ const AlertModal: React.FC<{ message: string; onClose: () => void }> = ({ messag
 };
 
 const DateRangeModal: React.FC<{
-  onConfirm: (dataInicial: string, dataFinal: string) => void;
+  onConfirm: (formId: string) => void;
   onCancel: () => void;
-  defaultDataInicial?: string;
-  defaultDataFinal?: string;
-}> = ({ onConfirm, onCancel, defaultDataInicial = '', defaultDataFinal = '' }) => {
-  const [dataInicial, setDataInicial] = useState(defaultDataInicial);
-  const [dataFinal, setDataFinal] = useState(defaultDataFinal);
+  formularios: Formulario[];
+  selectedFormId: string;
+}> = ({ onConfirm, onCancel, formularios, selectedFormId }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [formId, setFormId] = useState(selectedFormId);
 
   const handleConfirm = () => {
-    if (!dataInicial || !dataFinal) {
-      setErrorMessage('Por favor, selecione ambas as datas.');
-      return;
-    }
-    if (new Date(dataInicial) > new Date(dataFinal)) {
-      setErrorMessage('A Data Inicial não pode ser posterior à Data Final.');
+    if (!formId) {
+      setErrorMessage('Por favor, selecione um formulario.');
       return;
     }
     setErrorMessage(null);
-    onConfirm(dataInicial, dataFinal);
+    onConfirm(formId);
   };
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 animate-fade-in">
       <div className="bg-white rounded-lg p-8 shadow-2xl max-w-md w-full transform scale-95 animate-scale-in">
         <h3 className="text-xl font-bold mb-4 text-gray-800">Gerar Relatório PDF</h3>
-        <p className="text-gray-700 mb-6">Selecione o intervalo de datas para o relatório:</p>
+        <p className="text-gray-700 mb-6">Selecione um formularios</p>
 
-        <div className="mb-4">
-          <label htmlFor="modalDataInicial" className="block text-sm font-medium text-gray-700">Data Inicial:</label>
-          <input
-            type="date"
-            id="modalDataInicial"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-            value={dataInicial}
-            onChange={(e) => { setDataInicial(e.target.value); setErrorMessage(null); }}
-          />
-        </div>
-
-        <div className="mb-6">
-          <label htmlFor="modalDataFinal" className="block text-sm font-medium text-gray-700">Data Final:</label>
-          <input
-            type="date"
-            id="modalDataFinal"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-            value={dataFinal}
-            onChange={(e) => { setDataFinal(e.target.value); setErrorMessage(null); }}
-          />
-        </div>
+        <div className="md:col-span-1 lg:col-span-3 mb-4">
+            <label htmlFor="filterFormulario" className="block text-sm font-medium text-gray-700">Filtrar por Formulário</label>
+            <select
+              id="filterFormulario"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
+              value={formId}
+              onChange={(e) => setFormId(e.target.value)}
+            >
+              <option value="">Todos os Formulários</option>
+              {formularios.map(form => (
+                <option key={form._id} value={form._id}>{form.nome}</option>
+              ))}
+            </select>
+          </div>
 
         {errorMessage && (
           <p className="text-red-500 text-sm mb-4">{errorMessage}</p>
@@ -202,12 +170,11 @@ const EditModal: React.FC<{
         },
         body: JSON.stringify(formData),
       });
-
       if (!response.ok) {
         let errorData;
         try {
           errorData = await response.json();
-        } catch (jsonError) {
+        } catch {
           throw new Error(`Erro HTTP! Status: ${response.status} - ${response.statusText}`);
         }
         throw new Error(errorData.msg || errorData.message || 'Falha ao atualizar o cadastro.');
@@ -219,8 +186,9 @@ const EditModal: React.FC<{
       setAlertMessage('Cadastro atualizado com sucesso!');
       setShowAlert(true);
       onClose();
-    } catch (err: any) {
-      setAlertMessage(`Erro ao atualizar cadastro: ${err.message}`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao atualizar cadastro.';
+      setAlertMessage(`Erro ao atualizar cadastro: ${errorMessage}`);
       setShowAlert(true);
       console.error('Erro ao atualizar cadastro:', err);
     }
@@ -238,7 +206,7 @@ const EditModal: React.FC<{
               id="nome"
               name="nome"
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-              value={formData.nome || ''}
+              value={formData.nomeCompleto || ''}
               onChange={handleChange}
             />
           </div>
@@ -399,7 +367,7 @@ const EditModal: React.FC<{
               type="number"
               id="salarioBase"
               name="salarioBase"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"// Explícito para métodos
               value={formData.salarioBase || ''}
               onChange={handleChange}
             />
@@ -551,37 +519,44 @@ function Dash() {
   const [cadastroSelecionado, setCadastroSelecionado] = useState<Cadastro | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const navigate = useNavigate();
 
   const [filterNomeRazaoSocial, setFilterNomeRazaoSocial] = useState<string>('');
   const [filterSituacaoFuncional, setFilterSituacaoFuncional] = useState<string>('');
-  const [filterDataCadastramentoInicial, setFilterDataCadastramentoInicial] = useState<string>('');
-  const [filterDataCadastramentoFinal, setFilterDataCadastramentoFinal] = useState<string>('');
   const [filterMatricula, setFilterMatricula] = useState<string>('');
-  const [filterDataNascimentoInicial, setFilterDataNascimentoInicial] = useState<string>('');
-  const [filterDataNascimentoFinal, setFilterDataNascimentoFinal] = useState<string>('');
   const [filterEmail, setFilterEmail] = useState<string>('');
   const [filterSexo, setFilterSexo] = useState<string>('');
   const [deletedAt, setDeletedAt] = useState<string>('');
+  const [selectedFormId, setSelectedFormId] = useState<string>('');
+  const [formularios, setFormularios] = useState<Formulario[]>([]);
+
 
   const [showRelatorioDateModal, setShowRelatorioDateModal] = useState(false);
-  const [relatorioDataInicial,] = useState<string>('');
-  const [relatorioDataFinal,] = useState<string>('');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmModalMessage, setConfirmModalMessage] = useState('');
-  const [confirmModalCallback, setConfirmModalCallback] = useState<(() => void) | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertModalMessage, setAlertModalMessage] = useState('');
   const [alertModalCallback,] = useState<(() => void) | null>(null);
 
-  const generoChartRef = useRef<HTMLCanvasElement>(null);
-  const lotacaoChartRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const fetchFormularios = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/api/formularios/nomes");
+        if (!response.ok) {
+          throw new Error('Erro ao carregar os formulários.');
+        }
+        const data = await response.json();
+        setFormularios(data);
+      } catch (err: unknown) {
+        console.error("Erro ao buscar formulários:", err);
+      }
+    };
 
-  const generoChartInstance = useRef<Chart | null>(null);
-  const lotacaoChartInstance = useRef<Chart | null>(null);
+    fetchFormularios();
+  }, []);
 
   const fetchCadastros = async () => {
     setLoading(true);
@@ -589,26 +564,17 @@ function Dash() {
     try {
       const queryParams = new URLSearchParams();
 
+      if (selectedFormId) {
+        queryParams.append('formId', selectedFormId);
+      }
       if (filterNomeRazaoSocial) {
-        queryParams.append('nomeRazaoSocial', filterNomeRazaoSocial);
+        queryParams.append('nomeCompleto', filterNomeRazaoSocial);
       }
       if (filterSituacaoFuncional) {
         queryParams.append('situacaoFuncional', filterSituacaoFuncional);
       }
-      if (filterDataCadastramentoInicial) {
-        queryParams.append('dataCadastramentoInicial', filterDataCadastramentoInicial);
-      }
-      if (filterDataCadastramentoFinal) {
-        queryParams.append('dataCadastramentoFinal', filterDataCadastramentoFinal);
-      }
       if (filterMatricula) {
         queryParams.append('matricula', filterMatricula);
-      }
-      if (filterDataNascimentoInicial) {
-        queryParams.append('dataNascimentoInicial', filterDataNascimentoInicial);
-      }
-      if (filterDataNascimentoFinal) {
-        queryParams.append('dataNascimentoFinal', filterDataNascimentoFinal);
       }
       if (filterEmail) {
         queryParams.append('email', filterEmail);
@@ -620,7 +586,7 @@ function Dash() {
         queryParams.append('Deletado', deletedAt)
       }
 
-      const url = `https://api.empactoon.com.br/api/formularios/filtros?${queryParams.toString()}`;
+      const url = `http://localhost:3001/api/formularios/filtros?${queryParams.toString()}`;
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -630,9 +596,10 @@ function Dash() {
 
       const data: Cadastro[] = await response.json();
       setCadastros(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Falha ao carregar os dados.';
       console.error("Erro ao buscar cadastros:", err);
-      setError(err.message || 'Falha ao carregar os dados.');
+      setError(errorMessage);
       setCadastros([]);
     } finally {
       setLoading(false);
@@ -642,121 +609,13 @@ function Dash() {
   useEffect(() => {
     fetchCadastros();
   }, [
+    selectedFormId,
     filterNomeRazaoSocial,
     filterSituacaoFuncional,
-    filterDataCadastramentoInicial,
-    filterDataCadastramentoFinal,
     filterMatricula,
-    filterDataNascimentoInicial,
-    filterDataNascimentoFinal,
-    filterEmail,
     filterSexo,
     deletedAt
   ]);
-
-
-  useEffect(() => {
-    const generoCounts = cadastros.reduce((acc, curr) => {
-      acc[curr.sexo] = (acc[curr.sexo] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    if (generoChartRef.current) {
-      const ctx = generoChartRef.current.getContext('2d');
-      if (ctx) {
-        if (generoChartInstance.current) {
-          generoChartInstance.current.destroy();
-        }
-
-        generoChartInstance.current = new Chart(ctx, {
-          type: 'pie',
-          data: {
-            labels: Object.keys(generoCounts),
-            datasets: [{
-              data: Object.values(generoCounts),
-              backgroundColor: ['#6366F1', '#EC4899', '#FCD34D'],
-            }],
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                position: 'top',
-              },
-              title: {
-                display: true,
-                text: 'Distribuição por Sexo',
-              },
-            },
-          },
-        });
-      }
-    }
-
-    const lotacaoCounts = cadastros.reduce((acc, curr) => {
-      if (curr.lotacao) {
-        acc[curr.lotacao] = (acc[curr.lotacao] || 0) + 1;
-      }
-      return acc;
-    }, {} as Record<string, number>);
-
-    if (lotacaoChartRef.current) {
-      const ctx = lotacaoChartRef.current.getContext('2d');
-      if (ctx) {
-        if (lotacaoChartInstance.current) {
-          lotacaoChartInstance.current.destroy();
-        }
-
-        lotacaoChartInstance.current = new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels: Object.keys(lotacaoCounts),
-            datasets: [{
-              label: 'Cadastros por Lotação',
-              data: Object.values(lotacaoCounts),
-              backgroundColor: '#3B82F6',
-            }],
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: {
-                display: false,
-              },
-              title: {
-                display: true,
-                text: 'Cadastros por Lotação',
-              },
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-              },
-            },
-          },
-        });
-      }
-    }
-    return () => {
-      if (generoChartInstance.current) {
-        generoChartInstance.current.destroy();
-        generoChartInstance.current = null;
-      }
-      if (lotacaoChartInstance.current) {
-        lotacaoChartInstance.current.destroy();
-        lotacaoChartInstance.current = null;
-      }
-    };
-  }, [cadastros]);
-
-  const handleVisualizar = (cadastro: Cadastro) => {
-    setCadastroSelecionado(cadastro);
-  };
-
-  const handleEditar = (cadastro: Cadastro) => {
-    setCadastroSelecionado(cadastro);
-    setShowEditModal(true);
-  };
 
   const handleSaveEditedCadastro = (updatedCadastro: Cadastro) => {
     setCadastros(prevCadastros =>
@@ -765,41 +624,15 @@ function Dash() {
     setShowEditModal(false);
   };
 
-  const handleExcluir = (id: string) => {
-    setConfirmModalMessage('Tem certeza que deseja excluir (soft delete) este cadastro?');
-    setConfirmModalCallback(async () => {
-      try {
-        const response = await fetch(`http://localhost:3000/api/formularios/${id}`, {
-          method: 'DELETE',
-        });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.msg || 'Falha ao excluir o cadastro.');
-        }
-
-        setShowConfirmModal(false);
-        setShowAlertModal(true);
-        setAlertModalMessage('Cadastro soft-deletado com sucesso!');
-        fetchCadastros();
-      } catch (err: any) {
-        setShowConfirmModal(false);
-        setShowAlertModal(true);
-        setAlertModalMessage(`Erro ao excluir cadastro: ${err.message}`);
-        console.error('Erro ao excluir cadastro:', err);
-      }
-    });
-    setShowConfirmModal(true);
-  };
-
-  const generateAndDownloadPdf = async (dataInicial: string, dataFinal: string) => {
+  const generateAndDownloadPdf = async (formId: string) => {
     setShowRelatorioDateModal(false);
     setIsGeneratingPdf(true);
     setError(null);
 
     try {
       const response = await fetch(
-        `https://api.empactoon.com.br/api/formulario/relatorio-pdf?dataInicial=${dataInicial}&dataFinal=${dataFinal}`,
+        `http://localhost:3001/api/formularios/relatorio-pdf?formId=${formId}`,
         {
           method: "GET",
         }
@@ -808,9 +641,8 @@ function Dash() {
       if (!response.ok) {
         let errorMsg = 'Falha ao gerar o relatório.';
         try {
-          const errorData = await response.json();
-          errorMsg = errorData.msg || errorData.message || errorMsg;
-        } catch (jsonError) {
+          await response.json();
+        } catch {
           errorMsg = `Erro ${response.status}: ${response.statusText}`;
         }
         throw new Error(errorMsg);
@@ -821,7 +653,7 @@ function Dash() {
 
       const a = document.createElement('a');
       a.href = url;
-      a.download = `relatorio_cadastros_${dataInicial}_${dataFinal}.pdf`;
+      a.download = `relatorio_cadastros_${formId}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -830,107 +662,59 @@ function Dash() {
       setShowAlertModal(true);
       setAlertModalMessage('Relatório PDF gerado e baixado com sucesso!');
 
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao gerar relatório.';
       console.error("Erro ao gerar relatório:", err);
-      setError(err.message || 'Falha ao gerar relatório.');
+      setError(errorMessage);
       setShowAlertModal(true);
-      setAlertModalMessage(`Erro ao gerar relatório: ${err.message}`);
+      setAlertModalMessage(`Erro ao gerar relatório: ${errorMessage}`);
     } finally {
       setIsGeneratingPdf(false);
     }
   };
+  
+  const handleGerenciarFormulario = () =>{
+    navigate('/gerenciarFormulario');
+  }
 
   const handleRelatorio = () => {
     setShowRelatorioDateModal(true);
   };
 
   const handleClearFilters = () => {
+    setSelectedFormId('');
     setFilterNomeRazaoSocial('');
     setFilterSituacaoFuncional('');
-    setFilterDataCadastramentoInicial('');
-    setFilterDataCadastramentoFinal('');
     setFilterMatricula('');
-    setFilterDataNascimentoInicial('');
-    setFilterDataNascimentoFinal('');
     setFilterEmail('');
     setFilterSexo('');
     setDeletedAt('');
   };
 
-  const handleRestore = async (id: string) => {
-    setConfirmModalMessage('Tem certeza que deseja restaurar este cadastro?');
-    setConfirmModalCallback(async () => {
-      try {
-        const response = await fetch(`https://api.empactoon.com.br/api/formularios/undelete/${id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          let errorData;
-          try {
-            errorData = await response.json();
-          } catch (jsonError) {
-            throw new Error(`Erro HTTP! Status: ${response.status} - ${response.statusText}`);
-          }
-          throw new Error(errorData.msg || 'Falha ao restaurar o cadastro.');
-        }
-
-        const result = await response.json();
-        const restoredCadastro = result.formulario; 
-
-        setCadastros(prevCadastros =>
-          prevCadastros.map(c => (c._id === restoredCadastro._id ? restoredCadastro : c))
-        );
-
-        setShowConfirmModal(false);
-        setShowAlertModal(true);
-        setAlertModalMessage(result.msg || 'Cadastro restaurado com sucesso!'); 
-      } catch (err: any) {
-        setShowConfirmModal(false);
-        setShowAlertModal(true);
-        setAlertModalMessage(`Erro ao restaurar cadastro: ${err.message}`);
-        console.error('Erro ao restaurar cadastro:', err);
-      }
-    });
-    setShowConfirmModal(true);
-  };
 
   return (
     <div className="min-h-screen bg-gray-100 p-8 font-sans">
-      <h1 className="text-4xl font-bold text-gray-800 mb-8 text-center">Mini Dashboard SINDSERCH DF</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 ">
-        <div className="bg-white p-6 h-[300px] rounded-lg shadow-md flex items-center justify-between transform transition-transform duration-200 hover:scale-105">
-          <div>
-            <p className="text-lg text-gray-500">Total de Cadastros</p>
-            {loading ? (
-              <p className="text-4xl font-bold text-indigo-600">Carregando...</p>
-            ) : error ? (
-              <p className="text-xl text-red-500">Erro!</p>
-            ) : (
-              <p className="text-4xl font-bold text-indigo-600">{cadastros.length}</p>
-            )}
-          </div>
-          <FiEye className="text-indigo-400 text-5xl" />
-        </div>
-
-        <div className="bg-white p-6 h-[300px] rounded-lg shadow-md col-span-1 md:col-span-1 flex items-center justify-center">
-          <canvas ref={generoChartRef} className="max-w-full h-auto"></canvas>
-        </div>
-
-        <div className="bg-white p-6 h-[300px] rounded-lg shadow-md col-span-1 md:col-span-1 flex items-center justify-center">
-          <canvas ref={lotacaoChartRef} className="max-w-full h-auto"></canvas>
-        </div>
-      </div>
+      <h1 className="text-4xl font-bold text-gray-800 mb-8 text-center">Mini Dashboard Empactoon</h1>
 
       <div className="bg-white p-8 rounded-lg shadow-md mb-8">
         <h2 className="text-2xl font-semibold text-gray-700 mb-6 flex items-center">
-          <FiSearch className="mr-2" /> Filtros de Cadastros
+          <i className="fa-solid fa-magnifying-glass mr-2" /> Filtros de Cadastros
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="md:col-span-1 lg:col-span-3">
+            <label htmlFor="filterFormulario" className="block text-sm font-medium text-gray-700">Filtrar por Formulário</label>
+            <select
+              id="filterFormulario"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
+              value={selectedFormId}
+              onChange={(e) => setSelectedFormId(e.target.value)}
+            >
+              <option value="">Todos os Formulários</option>
+              {formularios.map(form => (
+                <option key={form._id} value={form._id}>{form.nome}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label htmlFor="filterNomeRazaoSocial" className="block text-sm font-medium text-gray-700">Nome / Razão Social</label>
             <input
@@ -940,77 +724,6 @@ function Dash() {
               value={filterNomeRazaoSocial}
               onChange={(e) => setFilterNomeRazaoSocial(e.target.value)}
               placeholder="Ex: João Silva ou Empresa XYZ"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="filterSituacaoFuncional" className="block text-sm font-medium text-gray-700">Situação Funcional</label>
-            <select
-              id="filterSituacaoFuncional"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-              value={filterSituacaoFuncional}
-              onChange={(e) => setFilterSituacaoFuncional(e.target.value)}
-            >
-              <option value="">Todas</option>
-              <option value="Ativo">Ativo</option>
-              <option value="Inativo">Inativo</option>
-              <option value="Licença">Licença</option>
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="filterDataCadastramentoInicial" className="block text-sm font-medium text-gray-700">Data de Cadastramento (Desde)</label>
-            <input
-              type="date"
-              id="filterDataCadastramentoInicial"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-              value={filterDataCadastramentoInicial}
-              onChange={(e) => setFilterDataCadastramentoInicial(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="filterDataCadastramentoFinal" className="block text-sm font-medium text-gray-700">Data de Cadastramento (Até)</label>
-            <input
-              type="date"
-              id="filterDataCadastramentoFinal"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-              value={filterDataCadastramentoFinal}
-              onChange={(e) => setFilterDataCadastramentoFinal(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="filterMatricula" className="block text-sm font-medium text-gray-700">Matrícula</label>
-            <input
-              type="text"
-              id="filterMatricula"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-              value={filterMatricula}
-              onChange={(e) => setFilterMatricula(e.target.value)}
-              placeholder="Ex: M001"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="filterDataNascimentoInicial" className="block text-sm font-medium text-gray-700">Data de Nascimento (Desde)</label>
-            <input
-              type="date"
-              id="filterDataNascimentoInicial"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-              value={filterDataNascimentoInicial}
-              onChange={(e) => setFilterDataNascimentoInicial(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="filterDataNascimentoFinal" className="block text-sm font-medium text-gray-700">Data de Nascimento (Até)</label>
-            <input
-              type="date"
-              id="filterDataNascimentoFinal"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-              value={filterDataNascimentoFinal}
-              onChange={(e) => setFilterDataNascimentoFinal(e.target.value)}
             />
           </div>
 
@@ -1035,22 +748,8 @@ function Dash() {
               onChange={(e) => setFilterSexo(e.target.value)}
             >
               <option value="">Todos</option>
-              <option value="Masculino">Masculino</option>
-              <option value="Feminino">Feminino</option>
-              <option value="Outro">Outro</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor="deletedAt" className="block text-sm font-medium text-gray-700">Status de Exclusão</label>
-            <select
-              id="deletedAt"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
-              value={deletedAt}
-              onChange={(e) => setDeletedAt(e.target.value)}
-            >
-              <option value="">Todos</option>
-              <option value="true">Deletados</option>
-              <option value="false">Não Deletados</option>
+              <option value="masculino">Masculino</option>
+              <option value="feminino">Feminino</option>
             </select>
           </div>
 
@@ -1060,14 +759,20 @@ function Dash() {
             onClick={handleClearFilters}
             className="px-4 mr-3 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-colors duration-200 flex items-center"
           >
-            <FiXCircle className="mr-2" /> Limpar Filtros
+            <i className="fa-solid fa-xmark-circle mr-2" /> Limpar Filtros
           </button>
           <button
             onClick={handleRelatorio}
-            className="px-4 py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200 flex items-center"
+            className="px-4 mr-3 py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200 flex items-center"
             disabled={loading || isGeneratingPdf}
           >
-            <IoReaderOutline className="mr-2" /> Gerar Relatório PDF
+            <i className="fa-solid fa-file-pdf mr-2" /> Gerar Relatório PDF
+          </button>
+          <button
+            onClick={handleGerenciarFormulario}
+            className="px-4 py-2 bg-purple-500 text-white font-semibold rounded-lg hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200 flex items-center"
+          >
+            <i className="fa-solid fa-file-pen mr-2" /> Gerenciar Formularios
           </button>
         </div>
       </div>
@@ -1103,8 +808,6 @@ function Dash() {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data de Cadastro</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data de Nascimento</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">E-mail</th>
-                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Soft Delete</th>
-                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -1114,7 +817,7 @@ function Dash() {
                       ? 'bg-red-100 hover:bg-red-200'
                       : 'hover:bg-gray-50'
                       } transition-colors duration-150`}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{cadastro.nome || cadastro.razaoSocial || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{cadastro.nomeCompleto || 'N/A'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cadastro.matricula || 'N/A'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cadastro.sexo || 'N/A'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cadastro.situacaoFuncional || 'N/A'}</td>
@@ -1125,42 +828,6 @@ function Dash() {
                         {cadastro.dataNascimento ? new Date(cadastro.dataNascimento).toLocaleDateString('pt-BR') : 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cadastro.email || 'N/A'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cadastro.deletedAt ? 'Deletado' : 'N/A'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-center space-x-3">
-                          <button
-                            onClick={() => handleVisualizar(cadastro)}
-                            className="text-indigo-600 hover:text-indigo-900 p-2 rounded-full hover:bg-indigo-100 transition-colors duration-200"
-                            title="Ver Detalhes"
-                          >
-                            <FiEye className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => handleEditar(cadastro)}
-                            className="text-blue-600 hover:text-blue-900 p-2 rounded-full hover:bg-blue-100 transition-colors duration-200"
-                            title="Editar"
-                          >
-                            <FiEdit className="h-5 w-5" />
-                          </button>
-                          {cadastro.deletedAt ? (
-                            <button
-                              onClick={() => handleRestore(cadastro._id)}
-                              className="text-green-600 hover:text-green-900 p-2 rounded-full hover:bg-green-100 transition-colors duration-200"
-                              title="Restaurar"
-                            >
-                              <IoReaderOutline className="h-5 w-5" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleExcluir(cadastro._id)}
-                              className="text-red-600 hover:text-red-900 p-2 rounded-full hover:bg-red-100 transition-colors duration-200"
-                              title="Excluir"
-                            >
-                              <FiTrash2 className="h-5 w-5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
                     </tr>
                   ))
                 ) : (
@@ -1180,7 +847,7 @@ function Dash() {
             <h3 className="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">Detalhes do Cadastro</h3>
             <div className="space-y-2 text-gray-700 overflow-y-auto max-h-[70vh] pr-2">
               <p><strong>ID:</strong> {cadastroSelecionado._id}</p>
-              <p><strong>Nome:</strong> {cadastroSelecionado.nome || 'N/A'}</p>
+              <p><strong>Nome:</strong> {cadastroSelecionado.nomeCompleto || 'N/A'}</p>
               <p><strong>Razão Social:</strong> {cadastroSelecionado.razaoSocial || 'N/A'}</p>
               <p><strong>Matrícula:</strong> {cadastroSelecionado.matricula || 'N/A'}</p>
               <p><strong>Sexo:</strong> {cadastroSelecionado.sexo || 'N/A'}</p>
@@ -1222,16 +889,6 @@ function Dash() {
         </div>
       )}
 
-      {showConfirmModal && (
-        <ConfirmModal
-          message={confirmModalMessage}
-          onConfirm={() => {
-            if (confirmModalCallback) confirmModalCallback();
-          }}
-          onCancel={() => setShowConfirmModal(false)}
-        />
-      )}
-
       {showAlertModal && (
         <AlertModal
           message={alertModalMessage}
@@ -1246,8 +903,8 @@ function Dash() {
         <DateRangeModal
           onConfirm={generateAndDownloadPdf}
           onCancel={() => setShowRelatorioDateModal(false)}
-          defaultDataInicial={relatorioDataInicial}
-          defaultDataFinal={relatorioDataFinal}
+          formularios={formularios}
+          selectedFormId={selectedFormId}
         />
       )}
 
