@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import LogoUploader from '../components/LogoUploader';
 
 // 1. Tipagem para as props do componente Modal
 interface ModalProps {
@@ -10,7 +11,6 @@ interface ModalProps {
   showCancel?: boolean;
 }
 
-// 2. Componente Modal tipado
 const Modal: React.FC<ModalProps> = ({ show, title, message, onConfirm, onCancel, showCancel = true }) => {
   if (!show) {
     return null;
@@ -46,44 +46,6 @@ const Modal: React.FC<ModalProps> = ({ show, title, message, onConfirm, onCancel
   );
 };
 
-// 3. Tipagem para as props do componente LogoUploader
-interface LogoUploaderProps {
-  onLogoChange: (logoUrl: string | null) => void;
-}
-
-// 4. Componente LogoUploader tipado
-const LogoUploader: React.FC<LogoUploaderProps> = ({ onLogoChange }) => {
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (reader.result) {
-          onLogoChange(reader.result as string);
-        } else {
-          onLogoChange(null);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  return (
-    <div>
-      <label className="block text-gray-700 font-semibold mb-2" htmlFor="logoUpload">
-        Logotipo do Formulário
-      </label>
-      <input
-        id="logoUpload"
-        type="file"
-        accept="image/*"
-        onChange={handleFileChange}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-      />
-    </div>
-  );
-};
-
 interface Formulario {
   _id: string; 
   nome: string;
@@ -97,6 +59,10 @@ const GerenciarFormularios = () => {
   const [camposSelecionados, setCamposSelecionados] = useState<string[]>([]);
   const [textoTermos, setTextoTermos] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  
+  // Novos estados para a lista de usuários
+  const [usuarios, setUsuarios] = useState<{ _id: string, username: string }[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
 
   const [showModal, setShowModal] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
@@ -112,7 +78,6 @@ const GerenciarFormularios = () => {
     'whatsapp', 'email', 'bancoRecebimento', 'observacoes', 'aceitaTermos', 'mensagem'
   ];
 
-  // 5. Parâmetros de função tipados
   const showInfoModal = (title: string, message: string) => {
     setModalTitle(title);
     setModalMessage(message);
@@ -121,7 +86,6 @@ const GerenciarFormularios = () => {
     setShowModal(true);
   };
 
-  // 6. Parâmetros de função tipados
   const showConfirmationModal = (title: string, message: string, onConfirm: () => void) => {
     setModalTitle(title);
     setModalMessage(message);
@@ -133,61 +97,116 @@ const GerenciarFormularios = () => {
     setShowModal(true);
   };
 
-  const fetchFormularios = async () => {
+  interface UserData {
+    username: string;
+    role: 'admin' | 'user'; 
+    id: string;
+  }
+
+const fetchFormularios = async () => {
     try {
-      const response = await fetch("https://api.empactoon.com.br/api/formulariosCriados");
-      if (!response.ok) {
-        throw new Error(`Erro na rede: ${response.statusText}`);
-      }
-      const data = await response.json();
-      setFormularios(data);
+        const userDataString = localStorage.getItem('user'); 
+        
+        if (!userDataString) {
+            console.error("Dados do usuário não encontrados.");
+            showInfoModal('Atenção', 'Você precisa estar logado para ver os formulários.');
+            return; 
+        }
+
+        const userData: UserData = JSON.parse(userDataString);
+        const { role, id } = userData;
+        const url = new URL("http://localhost:3001/api/formulariosCriados");
+        url.searchParams.append('role', role);
+        url.searchParams.append('userId', id);
+        
+        const response = await fetch(url.toString());
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: response.statusText }));
+            throw new Error(`Erro na rede: ${response.status} - ${errorData.message}`);
+        }
+
+        const data: Formulario[] = await response.json();
+        setFormularios(data);
+        
     } catch (error) {
-      console.error("Erro ao buscar formulários:", error);
-      showInfoModal('Erro', 'Erro ao carregar a lista de formulários.');
+        console.error("Erro ao buscar formulários:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
+        showInfoModal('Erro', `Erro ao carregar a lista de formulários: ${errorMessage}`);
     }
-  };
-
-  useEffect(() => {
-    fetchFormularios();
-  }, []);
+};
   
-  const criarNovoFormulario = async () => {
-    if (!nomeNovoForm || camposSelecionados.length === 0) {
-      showInfoModal('Atenção', 'Preencha o nome e selecione pelo menos um campo.');
-      return;
-    }
-
+  const fetchUsuariosNormais = async () => {
     try {
-      const response = await fetch("https://api.empactoon.com.br/api/criarFormularios", {
+      const user = localStorage.getItem('user');
+      const userRole = user ? JSON.parse(user).role : '';
+
+      const response = await fetch("http://localhost:3001/api/usuariosNormais", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          nome: nomeNovoForm,
-          campos: camposSelecionados,
-          textoTermos: textoTermos,
-          logoUrl: logoUrl,
-        }),
+        body: JSON.stringify({ role: userRole }),
       });
-
+      
       if (!response.ok) {
         throw new Error(`Erro na rede: ${response.statusText}`);
       }
-      
-      const formCriado = await response.json();
-      
-      setFormularios([...formularios, formCriado]);
-      setNomeNovoForm('');
-      setCamposSelecionados([]);
-      setTextoTermos('');
-      setLogoUrl(null);
-      showInfoModal('Sucesso', `Formulário "${formCriado.nome}" criado com sucesso! URL: ${formCriado.url}`);
+      const data = await response.json();
+      setUsuarios(data);
     } catch (error) {
-      console.error("Erro ao criar formulário:", error);
-      showInfoModal('Erro', 'Erro ao criar o formulário. Tente novamente.');
+      console.error("Erro ao buscar usuários:", error);
+      showInfoModal('Erro', 'Erro ao carregar a lista de usuários.');
     }
   };
+  
+  useEffect(() => {
+    fetchFormularios();
+    fetchUsuariosNormais();
+  }, []);
+  
+const criarNovoFormulario = async () => {
+    if (!nomeNovoForm || camposSelecionados.length === 0 || !selectedUserId) {
+      showInfoModal('Atenção', 'Preencha o nome, selecione pelo menos um campo e um usuário.');
+      return;
+    }
+
+    const user = localStorage.getItem('user');
+    const userRole = user ? JSON.parse(user).role : '';
+    try {
+      const response = await fetch("http://localhost:3001/api/criarFormularios", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nome: nomeNovoForm,
+          campos: camposSelecionados,
+          textoTermos: textoTermos,
+          logoUrl: logoUrl,
+          userId: selectedUserId, 
+          role: userRole 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro na rede: ${response.statusText}`);
+      }
+      
+      const formCriado = await response.json();
+      
+      setFormularios([...formularios, formCriado]);
+      setNomeNovoForm('');
+      setCamposSelecionados([]);
+      setTextoTermos('');
+      setLogoUrl(null);
+      setSelectedUserId(''); 
+      showInfoModal('Sucesso', `Formulário "${formCriado.nome}" criado com sucesso! URL: ${formCriado.url}`);
+    } catch (error) {
+      console.error("Erro ao criar formulário:", error);
+      showInfoModal('Erro', 'Erro ao criar o formulário. Tente novamente.');
+    }
+  };
 
   const handleCampoChange = (campo: string) => {
     setCamposSelecionados(prev =>
@@ -242,6 +261,23 @@ const GerenciarFormularios = () => {
                   placeholder="Ex: Contato Rápido"
                 />
                 <div className="mt-4">
+                  <label className="block text-gray-700 font-semibold mb-2">
+                    Atribuir Formulário a
+                  </label>
+                  <select
+                    value={selectedUserId}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  >
+                    <option value="">Selecione um usuário...</option>
+                    {usuarios.map(usuario => (
+                      <option key={usuario._id} value={usuario._id}>
+                        {usuario.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mt-4">
                   <label className="block text-gray-700 font-semibold mb-2" htmlFor="termos">
                     Texto dos Termos e Condições
                   </label>
@@ -255,7 +291,7 @@ const GerenciarFormularios = () => {
                   />
                 </div>
                 <div className="mt-4">
-                  <LogoUploader onLogoChange={setLogoUrl} />
+                  <LogoUploader onLogoUrlChange={setLogoUrl} />
                 </div>
               </div>
               

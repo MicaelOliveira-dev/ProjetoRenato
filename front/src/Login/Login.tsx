@@ -3,39 +3,42 @@ import { useNavigate } from 'react-router-dom';
 import Logo from '../assets/LOGO Sindserh BsB C1.png'
 
 function LoginScreen() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false); 
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    if (!email || !password) {
+    if (!username || !password) {
       setError('Por favor, preencha todos os campos.');
       setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch('https://api.empactoon.com.br/api/login', { 
+      const response = await fetch('http://localhost:3001/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('isLoggedIn', 'true');
+        // Salva o objeto do usuário, incluindo a role, no localStorage
+        if (data.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
         navigate('/dash');
       } else {
-        setError(data.msg || 'E-mail ou senha inválidos.');
+        setError(data.msg || 'Credenciais inválidas.');
       }
     } catch (apiError) {
       console.error("Erro no login:", apiError);
@@ -61,18 +64,18 @@ const handleLogin = async (e: React.FormEvent) => {
 
         <form onSubmit={handleLogin}>
           <div className="mb-5">
-            <label htmlFor="email" className="block text-gray-700 text-sm font-semibold mb-2">
-              E-mail
+            <label htmlFor="username" className="block text-gray-700 text-sm font-semibold mb-2">
+              Usuário
             </label>
             <input
-              type="email"
-              id="email"
+              type="text"
+              id="username"
               className="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200 ease-in-out"
-              placeholder="seu.email@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu.nome.de.usuario"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
-              disabled={loading} 
+              disabled={loading}
             />
           </div>
           <div className="mb-6">
@@ -87,7 +90,7 @@ const handleLogin = async (e: React.FormEvent) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              disabled={loading} 
+              disabled={loading}
             />
           </div>
 
@@ -99,9 +102,9 @@ const handleLogin = async (e: React.FormEvent) => {
             <button
               type="submit"
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-200 ease-in-out w-full transform active:scale-95"
-              disabled={loading} 
+              disabled={loading}
             >
-              {loading ? 'Entrando...' : 'Entrar'} 
+              {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </div>
         </form>

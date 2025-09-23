@@ -8,8 +8,8 @@ import RadioGroup from '../components/RadioGroup';
 import TextArea from '../components/TextArea';
 import Checkbox from '../components/Checkbox';
 
-const API_URL = 'https://api.empactoon.com.br/api/formulario';
-const API_SUBMIT_URL = 'https://api.empactoon.com.br/api/formularios/submeter';
+const API_URL = 'http://localhost:3001/api/formulario';
+const API_SUBMIT_URL = 'http://localhost:3001/api/formularios/submeter';
 
 // Mapeamento dos campos de seleção
 const getCampoOptions = (campo: string) => {

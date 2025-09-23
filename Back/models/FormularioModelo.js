@@ -23,9 +23,9 @@ const FormularioModeloSchema = new mongoose.Schema({
         type: String,
         required: false,
     },
-    usuarioCriador: {
+    userId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Usuario'
+        ref: 'UserSchema'
     }
 }, { timestamps: true });
 
