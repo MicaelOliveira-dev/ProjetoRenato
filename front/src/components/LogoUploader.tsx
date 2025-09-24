@@ -18,7 +18,7 @@ console.log("Evento onChange disparado!");
 
       try {
         // 2. Envie o arquivo para um endpoint de upload separado
-        const response = await fetch('http://localhost:3001/api/uploadLogo', {
+        const response = await fetch('https://api.empactoon.com.br/api/uploadLogo', {
           method: 'POST',
           body: formData,
         });

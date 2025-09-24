@@ -115,7 +115,7 @@ const fetchFormularios = async () => {
 
         const userData: UserData = JSON.parse(userDataString);
         const { role, id } = userData;
-        const url = new URL("http://localhost:3001/api/formulariosCriados");
+        const url = new URL("https://api.empactoon.com.br/api/formulariosCriados");
         url.searchParams.append('role', role);
         url.searchParams.append('userId', id);
         
@@ -141,7 +141,7 @@ const fetchFormularios = async () => {
       const user = localStorage.getItem('user');
       const userRole = user ? JSON.parse(user).role : '';
 
-      const response = await fetch("http://localhost:3001/api/usuariosNormais", {
+      const response = await fetch("https://api.empactoon.com.br/api/usuariosNormais", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -174,7 +174,7 @@ const criarNovoFormulario = async () => {
     const user = localStorage.getItem('user');
     const userRole = user ? JSON.parse(user).role : '';
     try {
-      const response = await fetch("http://localhost:3001/api/criarFormularios", {
+      const response = await fetch("https://api.empactoon.com.br/api/criarFormularios", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

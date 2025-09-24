@@ -524,7 +524,7 @@ useEffect(() => {
           userId: user.id
         });
 
-        const response = await fetch(`http://localhost:3001/api/formulariosCriados?${queryParams.toString()}`);
+        const response = await fetch(`https://api.empactoon.com.br/api/formulariosCriados?${queryParams.toString()}`);
         
         if (!response.ok) {
           throw new Error('Erro ao carregar os formulários.');
@@ -589,7 +589,7 @@ const fetchCadastros = async () => {
             queryParams.append('deletedAt', deletedAt)
         }
 
-        const url = `http://localhost:3001/api/formularios/filtros?${queryParams.toString()}`;
+        const url = `https://api.empactoon.com.br/api/formularios/filtros?${queryParams.toString()}`;
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -635,7 +635,7 @@ const fetchCadastros = async () => {
 
     try {
       const response = await fetch(
-        `http://localhost:3001/api/formularios/relatorio-pdf?formId=${formId}`,
+        `https://api.empactoon.com.br/api/formularios/relatorio-pdf?formId=${formId}`,
         {
           method: "GET",
         }
