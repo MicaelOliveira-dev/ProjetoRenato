@@ -32,8 +32,8 @@ function LoginScreen() {
       const data = await response.json();
 
       if (response.ok) {
-        // Salva o objeto do usuário, incluindo a role, no localStorage
         if (data.user) {
+          localStorage.setItem('isLoggedIn', 'true')
           localStorage.setItem('user', JSON.stringify(data.user));
         }
         navigate('/dash');

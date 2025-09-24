@@ -161,39 +161,6 @@ const EditModal: React.FC<{
     }
   };
 
-  const handleSave = async () => {
-    try {
-      const response = await fetch(`https://api.empactoon.com.br/api/formularios/${formData._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch {
-          throw new Error(`Erro HTTP! Status: ${response.status} - ${response.statusText}`);
-        }
-        throw new Error(errorData.msg || errorData.message || 'Falha ao atualizar o cadastro.');
-      }
-
-      const updatedCadastro = await response.json();
-
-      onSave(updatedCadastro);
-      setAlertMessage('Cadastro atualizado com sucesso!');
-      setShowAlert(true);
-      onClose();
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao atualizar cadastro.';
-      setAlertMessage(`Erro ao atualizar cadastro: ${errorMessage}`);
-      setShowAlert(true);
-      console.error('Erro ao atualizar cadastro:', err);
-    }
-  };
-
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 animate-fade-in">
       <div className="bg-white rounded-lg p-8 shadow-2xl max-w-2xl w-full transform scale-95 animate-scale-in overflow-y-auto max-h-[90vh]">
@@ -494,20 +461,6 @@ const EditModal: React.FC<{
             <label htmlFor="aceitaTermos" className="ml-2 block text-sm text-gray-900">Aceita Termos</label>
           </div>
         </form>
-        <div className="flex justify-end space-x-4 mt-6">
-          <button
-            onClick={onClose}
-            className="px-5 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
-          >
-            Salvar Alterações
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -531,20 +484,48 @@ function Dash() {
   const [selectedFormId, setSelectedFormId] = useState<string>('');
   const [formularios, setFormularios] = useState<Formulario[]>([]);
 
+    const [message, setMessage] = useState({ text: '', type: '' });
 
   const [showRelatorioDateModal, setShowRelatorioDateModal] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const [showEditModal, setShowEditModal] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertModalMessage, setAlertModalMessage] = useState('');
   const [alertModalCallback,] = useState<(() => void) | null>(null);
 
-  useEffect(() => {
+useEffect(() => {
+    const checkUserRole = () => {
+      try {
+        const userJson = localStorage.getItem('user');
+        if (userJson) {
+          const user = JSON.parse(userJson);
+          setIsAdmin(user.role === 'admin');
+        }
+      } catch (e) {
+        console.error("Falha ao analisar dados do usuário no localStorage", e);
+        setIsAdmin(false);
+      }
+    };
+
     const fetchFormularios = async () => {
       try {
-        const response = await fetch("http://localhost:3001/api/formularios/nomes");
+        // Pega a role e o userId do localStorage
+        const userJson = localStorage.getItem('user');
+        if (!userJson) {
+          throw new Error('Usuário não autenticado.');
+        }
+        const user = JSON.parse(userJson);
+
+        const queryParams = new URLSearchParams({
+          role: user.role,
+          userId: user.id
+        });
+
+        const response = await fetch(`http://localhost:3001/api/formulariosCriados?${queryParams.toString()}`);
+        
         if (!response.ok) {
           throw new Error('Erro ao carregar os formulários.');
         }
@@ -555,56 +536,78 @@ function Dash() {
       }
     };
 
+    checkUserRole();
     fetchFormularios();
   }, []);
 
-  const fetchCadastros = async () => {
+const fetchCadastros = async () => {
     setLoading(true);
     setError(null);
     try {
-      const queryParams = new URLSearchParams();
+        let userRole = null;
+        let userId = null;
 
-      if (selectedFormId) {
-        queryParams.append('formId', selectedFormId);
-      }
-      if (filterNomeRazaoSocial) {
-        queryParams.append('nomeCompleto', filterNomeRazaoSocial);
-      }
-      if (filterSituacaoFuncional) {
-        queryParams.append('situacaoFuncional', filterSituacaoFuncional);
-      }
-      if (filterMatricula) {
-        queryParams.append('matricula', filterMatricula);
-      }
-      if (filterEmail) {
-        queryParams.append('email', filterEmail);
-      }
-      if (filterSexo) {
-        queryParams.append('sexo', filterSexo);
-      }
-      if (deletedAt) {
-        queryParams.append('Deletado', deletedAt)
-      }
+        try {
+            const userDataString = localStorage.getItem('user');
+            if (userDataString) {
+                const userData = JSON.parse(userDataString);
+                userRole = userData.role;
+                userId = userData.id;
+            }
+        } catch (e) {
+            console.error("Erro ao ler ou analisar os dados do usuário do localStorage:", e);
+        }
 
-      const url = `http://localhost:3001/api/formularios/filtros?${queryParams.toString()}`;
-      const response = await fetch(url);
+        const queryParams = new URLSearchParams();
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ msg: 'Erro desconhecido' }));
-        throw new Error(errorData.msg || `Erro HTTP! Status: ${response.status}`);
-      }
+        if (userRole) {
+            queryParams.append('userRole', userRole);
+        }
+        if (userId) {
+            queryParams.append('userId', userId);
+        }
 
-      const data: Cadastro[] = await response.json();
-      setCadastros(data);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Falha ao carregar os dados.';
-      console.error("Erro ao buscar cadastros:", err);
-      setError(errorMessage);
-      setCadastros([]);
+        if (selectedFormId) {
+            queryParams.append('formId', selectedFormId);
+        }
+        if (filterNomeRazaoSocial) {
+            queryParams.append('nomeCompleto', filterNomeRazaoSocial);
+        }
+        if (filterSituacaoFuncional) {
+            queryParams.append('situacaoFuncional', filterSituacaoFuncional);
+        }
+        if (filterMatricula) {
+            queryParams.append('matricula', filterMatricula);
+        }
+        if (filterEmail) {
+            queryParams.append('email', filterEmail);
+        }
+        if (filterSexo) {
+            queryParams.append('sexo', filterSexo);
+        }
+        if (deletedAt) {
+            queryParams.append('deletedAt', deletedAt)
+        }
+
+        const url = `http://localhost:3001/api/formularios/filtros?${queryParams.toString()}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ msg: 'Erro desconhecido' }));
+            throw new Error(errorData.msg || `Erro HTTP! Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setCadastros(data);
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Falha ao carregar os dados.';
+        console.error("Erro ao buscar cadastros:", err);
+        setError(errorMessage);
+        setCadastros([]);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
 
   useEffect(() => {
     fetchCadastros();
@@ -691,10 +694,54 @@ function Dash() {
     setDeletedAt('');
   };
 
+  const excluirFormulario = async (formId: string) => {
+    console.log(`Tentando excluir formulário com o ID: ${formId}`);
+    // Aqui você implementaria a lógica de exclusão,
+    // como uma chamada de API para a rota de exclusão do backend.
+    // Por exemplo:
+    // try {
+    //   await fetch(`http://localhost:3001/api/formularios/${formId}`, { method: 'DELETE' });
+    //   fetchFormularios(); // Atualiza a lista após a exclusão
+    // } catch (error) {
+    //   console.error('Erro ao excluir formulário:', error);
+    // }
+  };
+
+ const handleLogout = () => {
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('user');
+        setMessage({
+            text: 'Você saiu com sucesso!',
+            type: 'success'
+        });
+        navigate('/login');
+        setTimeout(() => {
+            setMessage({ text: '', type: '' });
+        }, 3000);
+    };
+
 
   return (
     <div className="min-h-screen bg-gray-100 p-8 font-sans">
       <h1 className="text-4xl font-bold text-gray-800 mb-8 text-center">Mini Dashboard Empactoon</h1>
+        {/* Logout Button */}
+        <div className="w-full flex justify-end mb-5">
+                {/* Logout Button */}
+                <button
+                    onClick={handleLogout}
+                    className="bg-rose-500 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 ease-in-out hover:bg-rose-600 focus:outline-none focus:ring-4 focus:ring-rose-300 transform active:scale-95"
+                >
+                    Sair
+                </button>
+        </div>
+        {/* Feedback message box */}
+        {message.text && (
+            <div className={`mt-6 p-4 rounded-lg text-sm transition-all duration-500 ease-in-out ${
+                message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            }`}>
+                <p className="font-medium">{message.text}</p>
+            </div>
+        )}
 
       <div className="bg-white p-8 rounded-lg shadow-md mb-8">
         <h2 className="text-2xl font-semibold text-gray-700 mb-6 flex items-center">
@@ -768,17 +815,19 @@ function Dash() {
           >
             <i className="fa-solid fa-file-pdf mr-2" /> Gerar Relatório PDF
           </button>
-          <button
-            onClick={handleGerenciarFormulario}
-            className="px-4 py-2 bg-purple-500 text-white font-semibold rounded-lg hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200 flex items-center"
-          >
-            <i className="fa-solid fa-file-pen mr-2" /> Gerenciar Formularios
-          </button>
+          {isAdmin && (
+            <button
+              onClick={handleGerenciarFormulario}
+              className="px-4 py-2 bg-purple-500 text-white font-semibold rounded-lg hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200 flex items-center"
+            >
+              <i className="fa-solid fa-file-pen mr-2" /> Gerenciar Formularios
+            </button>
+          )}
         </div>
       </div>
 
 
-      <div className="bg-white p-8 rounded-lg shadow-md">
+      <div className="bg-white p-8 rounded-lg shadow-md mb-8">
         <h2 className="text-2xl font-semibold text-gray-700 mb-6">Lista de Cadastros</h2>
         {loading ? (
           <div className="text-center py-8">
@@ -840,6 +889,46 @@ function Dash() {
           </div>
         )}
       </div>
+      <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-200 mt-8">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Formulários Ativos</h2>
+        {formularios.length > 0 ? (
+          <ul className="divide-y divide-gray-200">
+            {formularios.map((form) => (
+              <li key={form._id} className="py-5 flex flex-col md:flex-row justify-between items-start md:items-center">
+                <div className="mb-2 md:mb-0">
+                  <h3 className="text-lg font-semibold text-gray-900">{form.nome}</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Campos: <span className="font-medium">{form.campos.join(', ')}</span>
+                  </p>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <a 
+                    href={form.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-blue-600 hover:text-blue-800 font-medium break-all text-sm transition-colors"
+                  >
+                    {form.url}
+                  </a>
+                  {isAdmin && (
+                    <button
+                      onClick={() => excluirFormulario(form._id)}
+                      className="text-red-600 hover:text-red-800 transition-colors"
+                      title="Excluir Formulário"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-gray-500 italic text-center py-4">Nenhum formulário ativo no momento.</p>
+        )}
+      </div>
 
       {cadastroSelecionado && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 animate-fade-in">

@@ -162,11 +162,9 @@ app.post('/api/usuariosNormais', async (req, res) => {
     }
 });
 
-// Rota para administradores e usuários normais: Gerar relatório PDF
 app.get('/api/formularios/relatorio-pdf', async (req, res) => {
     try {
         const { formId } = req.query;
-        const { role, id: userId } = req.session.user;
 
         if (!formId) {
             return res.status(400).json({ msg: 'Por favor, forneça o `formId` para o relatório.' });
@@ -175,12 +173,6 @@ app.get('/api/formularios/relatorio-pdf', async (req, res) => {
         let query = {
             formId: new mongoose.Types.ObjectId(formId)
         };
-        
-        // Se o usuário não for admin, filtra pelo seu próprio ID
-        if (role !== 'admin') {
-            query.userId = userId;
-        }
-
         let cadastros = await CadastroModelo.find(query);
 
         if (cadastros.length === 0) {
@@ -273,7 +265,6 @@ app.delete('/api/formulariosCriados/:id',  async (req, res) => {
     }
 });
 
-// Rota para administradores e usuários normais: Obter dados de formulários com filtros
 app.get('/api/formularios/filtros', async (req, res) => {
     try {
         const {
@@ -283,10 +274,19 @@ app.get('/api/formularios/filtros', async (req, res) => {
             matricula,
             email,
             sexo,
-            deletedAt
+            deletedAt,
+            userRole, 
+            userId    
         } = req.query;
+        if (userRole !== 'admin' && !formId) {
+            return res.status(403).json({ msg: 'Acesso negado. Você deve selecionar um formulário acima.' });
+        }
 
         let query = {};
+
+        if (userRole === 'user') {
+            query.userId = userId;
+        }
 
         if (formId) {
             query.formId = new mongoose.Types.ObjectId(formId);
@@ -315,12 +315,6 @@ app.get('/api/formularios/filtros', async (req, res) => {
         } else {
             query.deletedAt = null;
         }
-        
-        const { role, id: userId } = req.session.user;
-        if (role !== 'admin') {
-            query.userId = userId;
-        }
-
         const cadastros = await CadastroModelo.find(query);
 
         res.json(cadastros);
